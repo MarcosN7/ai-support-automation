@@ -1,10 +1,14 @@
 """
 STEP 1 — Message Classification Service.
 
-Takes a raw customer message and returns one of the predefined categories.
+Takes a raw customer message and returns one of the predefined categories
+along with a confidence score.
 Loads the classification prompt from an external .txt file and validates
 the LLM's output against the allowed category list.
 """
+
+import json
+from typing import Tuple
 
 from config import VALID_CATEGORIES, CLASSIFICATION_TEMPERATURE
 from prompts.prompt_loader import load_prompt
@@ -17,7 +21,7 @@ logger = get_logger()
 PROMPT_FILE = "classification_prompt.txt"
 
 
-def classify_message(message: str) -> str:
+def classify_message(message: str) -> Tuple[str, float]:
     """
     Classify a customer message into one of the predefined categories.
 
@@ -25,31 +29,48 @@ def classify_message(message: str) -> str:
         message: The raw customer support message.
 
     Returns:
-        A category string from VALID_CATEGORIES.
-        Falls back to "Other" if the LLM returns an unrecognized value.
+        A tuple of (category_string, confidence_score).
+        Falls back to ("Other", 0.0) if the LLM fails or returns invalid JSON.
     """
     logger.info(f"Classifying message: {message[:80]}...")
 
     system_prompt = load_prompt(PROMPT_FILE)
 
-    raw_category = call_llm(
+    raw_response = call_llm(
         prompt=message,
         system_prompt=system_prompt,
         temperature=CLASSIFICATION_TEMPERATURE,
-        max_tokens=50,   # Category names are short
+        max_tokens=150,   # Needs room for JSON
     )
 
-    # Clean up the LLM output — strip whitespace, quotes, trailing periods
-    category = raw_category.strip().strip('"').strip("'").rstrip(".")
+    try:
+        # Strip potential markdown blocks (e.g., ```json ... ```)
+        cleaned_response = raw_response.strip()
+        if cleaned_response.startswith("```json"):
+            cleaned_response = cleaned_response[7:]
+        if cleaned_response.endswith("```"):
+            cleaned_response = cleaned_response[:-3]
+        cleaned_response = cleaned_response.strip()
+
+        data = json.loads(cleaned_response)
+        category = data.get("category", "Other")
+        confidence = float(data.get("confidence", 0.0))
+
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.error(f"Classification JSON parse failed: {e}. Raw response: {raw_response}")
+        return "Other", 0.0
+
+    # Clean up the category — strip whitespace, quotes, trailing periods
+    category = category.strip().strip('"').strip("'").rstrip(".")
 
     # Validate against known categories (case-insensitive fuzzy match)
     for valid in VALID_CATEGORIES:
         if category.lower() == valid.lower():
-            logger.info(f"Classification result: {valid}")
-            return valid
+            logger.info(f"Classification result: {valid} (Confidence: {confidence})")
+            return valid, confidence
 
     # Fallback: if the model returned something unexpected, default to "Other"
     logger.warning(
-        f"Unrecognized category '{category}' — defaulting to 'Other'"
+        f"Unrecognized category '{category}' -- defaulting to 'Other' with low confidence"
     )
-    return "Other"
+    return "Other", 0.0

@@ -2,15 +2,15 @@
 Orchestrator — controls the multi-step AI workflow.
 
 This is the central controller that manages the full pipeline:
-  Step 1: classify_message()     → AI
-  Step 2: extract_data()         → AI
-  Step 3: determine_priority()   → Rules (no AI)
-  Step 4: generate_response()    → AI
+  Step 1: classify_message()     → AI (category + confidence)
+  Step 2: extract_data()         → AI (order_id + sentiment)
+  Step 3: determine_priority()   → Rules (no AI logic)
+  Step 4: workflows / routing    → Multi-path handling
 
 The orchestrator handles:
   • Sequential step execution with logging
   • Per-step retry logic for AI failures
-  • Validation gates between steps
+  • Validation gates (escalates to human if AI confidence < 0.70)
   • Batch processing with per-message error isolation
   • Final output assembly and validation
 """
@@ -20,7 +20,7 @@ import time
 from services.classifier import classify_message
 from services.extractor import extract_data
 from services.priority_engine import determine_priority
-from services.responder import generate_response
+from services.workflows import escalate_to_human, refund_workflow, complaint_workflow, standard_workflow
 from services.ai_client import OpenRouterError
 from utils.validator import validate_result, SupportTicketResult
 from utils.logger import get_logger
@@ -29,6 +29,8 @@ logger = get_logger()
 
 # Max retries for individual AI steps within the pipeline
 STEP_MAX_RETRIES = 2
+# Escalate if classification confidence is below this
+CONFIDENCE_THRESHOLD = 0.70
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -38,12 +40,6 @@ STEP_MAX_RETRIES = 2
 def process_message(message: str) -> dict:
     """
     Run a single customer message through the full 4-step pipeline.
-
-    Pipeline:
-      1. CLASSIFY   (AI)   → category
-      2. EXTRACT    (AI)   → order_id, sentiment
-      3. PRIORITY   (Rules)→ priority
-      4. RESPOND    (AI)   → customer reply
 
     Returns a validated result dict with keys:
       category, priority, sentiment, order_id, response
@@ -56,11 +52,30 @@ def process_message(message: str) -> dict:
 
     # ── STEP 1: Classification (AI) ──────────────────────────────
     logger.info("STEP 1/4: Classifying message...")
-    category = _run_with_retry(
+    category, confidence = _run_with_retry(
         step_name="classification",
         fn=lambda: classify_message(message),
-        fallback="Other",
+        fallback=("Other", 0.0),
     )
+    
+    # ── VALIDATION GATE: Confidence Check ────────────────────────
+    if confidence < CONFIDENCE_THRESHOLD:
+        logger.warning(
+            f"Validation Gate: Confidence ({confidence}) is below threshold ({CONFIDENCE_THRESHOLD}). "
+            f"Triggering escalation workflow."
+        )
+        # We still run priority logic to properly tag the escalated ticket
+        priority = determine_priority(category, "Neutral")
+        response_text = escalate_to_human(message, "Low Classification Confidence", category, None, priority, "Neutral")
+        
+        raw_result = {
+            "category": category,
+            "priority": priority,
+            "sentiment": "Neutral",
+            "order_id": None,
+            "response": response_text,
+        }
+        return _validate_and_finish(raw_result, start)
 
     # ── STEP 2: Data Extraction (AI) ─────────────────────────────
     logger.info("STEP 2/4: Extracting structured data...")
@@ -77,13 +92,20 @@ def process_message(message: str) -> dict:
     logger.info("STEP 3/4: Determining priority (rule engine)...")
     priority = determine_priority(category, sentiment)
 
-    # ── STEP 4: Response Generation (AI) ─────────────────────────
-    logger.info("STEP 4/4: Generating support response...")
+    # ── STEP 4: Routing & Response Generation (AI) ───────────────
+    logger.info(f"STEP 4/4: Routing to specific workflow based on category '{category}'...")
+    
+    def generate_routed_response():
+        if category == "Refund Request":
+            return refund_workflow(message, category, order_id, priority, sentiment)
+        elif category == "Complaint":
+            return complaint_workflow(message, category, order_id, priority, sentiment)
+        else:
+            return standard_workflow(message, category, order_id, priority, sentiment)
+
     response_text = _run_with_retry(
         step_name="response",
-        fn=lambda: generate_response(
-            message, category, order_id, priority, sentiment
-        ),
+        fn=generate_routed_response,
         fallback=(
             "We've received your message and our support team will get back "
             "to you shortly. Thank you for your patience."
@@ -99,7 +121,11 @@ def process_message(message: str) -> dict:
         "response": response_text,
     }
 
-    # ── Validate with Pydantic ───────────────────────────────────
+    return _validate_and_finish(raw_result, start)
+
+
+def _validate_and_finish(raw_result: dict, start_time: float) -> dict:
+    """Validate with Pydantic and finalize the output dict."""
     try:
         validated: SupportTicketResult = validate_result(raw_result)
         result = validated.model_dump()
@@ -109,9 +135,8 @@ def process_message(message: str) -> dict:
         logger.warning("Using raw (unvalidated) result as fallback.")
         result = raw_result
 
-    elapsed = time.time() - start
+    elapsed = time.time() - start_time
     logger.info(f"Message processed in {elapsed:.1f}s")
-
     return result
 
 
@@ -125,8 +150,6 @@ def process_batch(messages: list[str]) -> list[dict]:
 
     Each message is processed independently — a failure in one message
     does not affect others. Failed messages get a safe error result.
-
-    Returns a list of result dicts.
     """
     total = len(messages)
     results = []
@@ -166,17 +189,6 @@ def process_batch(messages: list[str]) -> list[dict]:
 def _run_with_retry(step_name: str, fn, fallback):
     """
     Execute a pipeline step with retry logic.
-
-    If the step fails after all retries, log the error and return
-    the fallback value so the pipeline continues.
-
-    Args:
-        step_name: Human-readable name for logging.
-        fn:        Callable that executes the step.
-        fallback:  Value to return if the step fails completely.
-
-    Returns:
-        The step result, or the fallback value on failure.
     """
     for attempt in range(1, STEP_MAX_RETRIES + 1):
         try:
