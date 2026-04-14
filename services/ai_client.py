@@ -2,10 +2,12 @@
 Reusable HTTP client for the OpenRouter API.
 
 This module is the ONLY place in the codebase that talks to OpenRouter.
-All other services call `call_openrouter()` and receive the LLM's text
-response (or a raised exception on failure).
+All other services use `call_llm()` or `call_openrouter()` and receive
+the LLM's text response (or a raised exception on failure).
 
 Features:
+  • call_llm(prompt) — simple single-prompt interface
+  • call_openrouter(messages) — full multi-message interface
   • Automatic retries with exponential back-off for transient errors
   • Structured logging of every request/response cycle
   • Timeout protection to prevent indefinite hangs
@@ -30,6 +32,50 @@ logger = get_logger()
 class OpenRouterError(Exception):
     """Raised when the OpenRouter API returns an error or an unexpected response."""
 
+
+# ═══════════════════════════════════════════════════════════════════
+# Simple interface — for most use cases
+# ═══════════════════════════════════════════════════════════════════
+
+def call_llm(
+    prompt: str,
+    system_prompt: str = "",
+    temperature: float = 0.3,
+    max_tokens: int = 1024,
+    model: str = DEFAULT_MODEL,
+) -> str:
+    """
+    Send a single prompt to the LLM and return the response text.
+
+    This is the preferred interface for most services. It wraps
+    call_openrouter() with a simpler signature.
+
+    Args:
+        prompt:        The user message / input to process.
+        system_prompt: Optional system-level instructions.
+        temperature:   Sampling temperature (lower = more deterministic).
+        max_tokens:    Maximum tokens in the completion.
+        model:         OpenRouter model identifier.
+
+    Returns:
+        The LLM's text response.
+    """
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": prompt})
+
+    return call_openrouter(
+        messages=messages,
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Full interface — for multi-message conversations
+# ═══════════════════════════════════════════════════════════════════
 
 def call_openrouter(
     messages: list[dict],

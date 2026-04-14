@@ -1,32 +1,31 @@
 # 🤖 AI Support Automation
 
-> An intelligent, LLM-powered backend system that automatically classifies, analyzes, and responds to customer support messages — designed to reduce manual workload for e-commerce support teams.
+> A production-style AI workflow engine that automatically classifies, analyzes, prioritizes, and responds to customer support messages — combining LLM intelligence with deterministic business rules.
 
 [![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)](https://python.org)
-[![OpenRouter](https://img.shields.io/badge/LLM-OpenRouter-6366F1?logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkw0IDdWMTdMMTIgMjJMMjAgMTdWN0wxMiAyWiIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+)](https://openrouter.ai)
+[![OpenRouter](https://img.shields.io/badge/LLM-OpenRouter_(Free)-6366F1)](https://openrouter.ai)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ---
 
-## ⚡ Quick Start (TL;DR)
+## ⚡ Quick Start
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/YOUR_USERNAME/ai-support-automation.git
+# Clone
+git clone https://github.com/MarcosN7/ai-support-automation.git
 cd ai-support-automation
 
-# 2. Set up Python environment
+# Setup
 python -m venv venv
-venv\Scripts\activate          # Windows
-# source venv/bin/activate     # macOS/Linux
+venv\Scripts\activate              # Windows
+# source venv/bin/activate         # macOS/Linux
 pip install -r requirements.txt
 
-# 3. Add your OpenRouter API key
-copy .env.example .env         # Windows
-# cp .env.example .env         # macOS/Linux
+# Configure API key
+copy .env.example .env             # Windows  (cp on macOS/Linux)
 # Edit .env → set OPENROUTER_API_KEY=sk-or-v1-xxxxx
 
-# 4. Run it
+# Run
 python main.py --message "Where is my order #12345?"
 ```
 
@@ -34,10 +33,10 @@ python main.py --message "Where is my order #12345?"
 
 ## 📋 Table of Contents
 
-- [Quick Start](#-quick-start-tldr)
-- [Problem Statement](#-problem-statement)
-- [Solution Overview](#-solution-overview)
-- [How It Works](#-how-it-works)
+- [Problem](#-problem)
+- [Solution](#-solution)
+- [System Architecture](#-system-architecture)
+- [Rule-Based Priority Engine](#-rule-based-priority-engine)
 - [Tech Stack](#-tech-stack)
 - [Project Structure](#-project-structure)
 - [Setup & Installation](#-setup--installation)
@@ -45,95 +44,119 @@ python main.py --message "Where is my order #12345?"
 - [Example Input/Output](#-example-inputoutput)
 - [OpenRouter Integration](#-openrouter-integration)
 - [Prompt Engineering](#-prompt-engineering)
-- [Architecture Decisions](#-architecture-decisions)
 - [Future Improvements](#-future-improvements)
-- [License](#-license)
 
 ---
 
-## 🎯 Problem Statement
+## 🎯 Problem
 
-E-commerce companies handle hundreds to thousands of customer support messages daily. Manual processing creates:
+E-commerce support teams handle hundreds of messages daily. Manual processing creates:
 
-- **Slow response times** — customers wait hours or days for a reply
+- **Slow response times** — customers wait hours or days
 - **Inconsistent quality** — different agents give different answers
 - **Misrouted tickets** — messages end up in the wrong queue
-- **Agent burnout** — repetitive tasks reduce morale and efficiency
-- **Missed insights** — sentiment and priority data isn't captured systematically
+- **No structured data** — sentiment and priority aren't captured
+- **Agent burnout** — repetitive work reduces morale
 
 ---
 
-## 💡 Solution Overview
+## 💡 Solution
 
-This system automates the first-response workflow by:
+A **multi-step AI workflow** that automates the entire first-response pipeline:
 
-1. **Classifying** each message into a business-relevant category
-2. **Extracting** structured data (order IDs, priority level, sentiment)
-3. **Generating** a professional, context-aware response
+1. **AI classifies** each message into a business category
+2. **AI extracts** structured data (order IDs, sentiment)
+3. **Rules determine** priority using deterministic business logic (no AI)
+4. **AI generates** a professional, context-aware response
 
-All outputs are validated, logged, and saved — ready to feed into CRM systems, dashboards, or escalation workflows.
+This is **not a chatbot**. It's an **automated triage and response engine** — an internal tool designed to plug into existing support infrastructure.
 
-This is **not a chatbot**. It's an automated triage and response engine designed to integrate into existing support infrastructure.
+### Why AI + Rules?
+
+| Layer | What it does | Why |
+|---|---|---|
+| **AI (LLM)** | Classification, extraction, response generation | Handles the nuance of natural language |
+| **Rules Engine** | Priority determination | 100% predictable, auditable, zero-cost, instant |
+
+Using AI for everything is expensive and unpredictable. The hybrid approach gives you the best of both worlds — intelligence where you need it and determinism where you don't.
 
 ---
 
-## ⚙️ How It Works
+## ⚙️ System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                   Customer Message                       │
-│  "My order #8834 hasn't shipped in 5 days. What's       │
-│   going on?"                                             │
-└────────────────────┬────────────────────────────────────┘
-                     │
-                     ▼
-        ┌────────────────────────┐
-        │   STEP 1: CLASSIFY     │
-        │   → "Order Issue"      │
-        └────────────┬───────────┘
-                     │
-                     ▼
-        ┌────────────────────────┐
-        │   STEP 2: EXTRACT      │
-        │   → order_id: #8834    │
-        │   → priority: Medium   │
-        │   → sentiment: Negative│
-        └────────────┬───────────┘
-                     │
-                     ▼
-        ┌────────────────────────┐
-        │   STEP 3: RESPOND      │
-        │   → Professional reply │
-        │     using all context  │
-        └────────────┬───────────┘
-                     │
-                     ▼
-        ┌────────────────────────┐
-        │   VALIDATE & SAVE      │
-        │   → Pydantic schema    │
-        │   → JSON / CSV output  │
-        └────────────────────────┘
+                    Customer Message
+                          │
+                          ▼
+               ┌─────────────────────┐
+               │    ORCHESTRATOR     │  ← controls flow, retries, validation
+               ├─────────────────────┤
+               │                     │
+               │  Step 1: CLASSIFY   │ → AI (LLM) → "Refund Request"
+               │         │          │
+               │  Step 2: EXTRACT    │ → AI (LLM) → {order_id, sentiment}
+               │         │          │
+               │  Step 3: PRIORITY   │ → Rules Engine (NO AI) → "High"
+               │         │          │
+               │  Step 4: RESPOND    │ → AI (LLM) → customer reply
+               │         │          │
+               │  ───── VALIDATE ────│ → Pydantic schema check
+               │         │          │
+               │  ────── SAVE ──────│ → JSON / CSV file
+               └─────────────────────┘
 ```
 
-Each step uses a **separate, optimized LLM call** with its own prompt template, temperature setting, and validation logic. This architecture ensures:
+### Orchestrator Features
 
-- **Independent validation** — each step's output is checked before moving on
-- **Easier debugging** — when something goes wrong, you know exactly which step failed
-- **Prompt iteration** — you can improve one step without affecting the others
+- **Sequential step execution** with structured logging
+- **Per-step retry logic** — if an AI step fails, it retries before using fallback
+- **Validation gates** — output is validated with Pydantic before saving
+- **Error isolation** — in batch mode, one failed message doesn't stop the rest
+- **Fallback values** — if all retries fail, the pipeline continues with safe defaults
+
+---
+
+## 🔧 Rule-Based Priority Engine
+
+Priority is determined by **pure Python logic** — no AI, no API calls, no cost.
+
+### Rules Matrix
+
+| Category | Sentiment | → Priority |
+|---|---|---|
+| Refund Request | Negative | **High** |
+| Complaint | Any | **High** |
+| Shipping Delay | Negative | **High** |
+| Refund Request | Neutral/Positive | Medium |
+| Order Issue | Any | Medium |
+| Shipping Delay | Neutral/Positive | Medium |
+| Product Question | Any | **Low** |
+| Other | Positive/Neutral | **Low** |
+
+### Why Rules?
+
+- ✅ **100% deterministic** — same inputs always produce the same output
+- ✅ **Zero latency** — no API call needed
+- ✅ **Free** — no token cost
+- ✅ **Auditable** — you can explain exactly why a ticket got its priority
+- ✅ **Testable** — easy to write unit tests for
+
+The rules live in `services/priority_engine.py` and can be updated without touching any AI prompts.
 
 ---
 
 ## 🛠 Tech Stack
 
-| Component        | Technology                                    |
-|------------------|-----------------------------------------------|
-| Language         | Python 3.10+                                  |
-| LLM Provider     | [OpenRouter](https://openrouter.ai/)          |
-| Default Model    | `anthropic/claude-sonnet-4.6`                 |
-| HTTP Client      | `requests`                                    |
-| Validation       | `pydantic` v2                                 |
-| Configuration    | `python-dotenv`                               |
-| Output Formats   | JSON, CSV                                     |
+| Component | Technology |
+|---|---|
+| Language | Python 3.10+ |
+| LLM Provider | [OpenRouter](https://openrouter.ai/) (free tier) |
+| Default Model | `openrouter/auto` |
+| HTTP Client | `requests` |
+| Validation | `pydantic` v2 |
+| Config | `python-dotenv` |
+| Output | JSON, CSV |
+| Priority Logic | Pure Python rules engine |
 
 ---
 
@@ -141,32 +164,35 @@ Each step uses a **separate, optimized LLM call** with its own prompt template, 
 
 ```
 ai-support-automation/
-├── main.py                    # CLI entry point (single + batch mode)
-├── config.py                  # Environment variables & constants
-├── requirements.txt           # Python dependencies
-├── .env.example               # API key template (copy to .env)
+├── main.py                         # CLI entry point
+├── config.py                       # Environment variables & constants
+├── requirements.txt                # Python dependencies
+├── .env.example                    # API key template
 │
-├── services/                  # Core business logic
-│   ├── openrouter_client.py   # Reusable OpenRouter HTTP client w/ retries
-│   ├── classifier.py          # Step 1: Message classification
-│   ├── extractor.py           # Step 2: Structured data extraction
-│   └── responder.py           # Step 3: Response generation
+├── services/                       # Core business logic
+│   ├── ai_client.py                # OpenRouter HTTP client (call_llm + call_openrouter)
+│   ├── classifier.py               # Step 1: Message classification (AI)
+│   ├── extractor.py                # Step 2: Data extraction (AI)
+│   ├── priority_engine.py          # Step 3: Rule-based priority (NO AI)
+│   ├── responder.py                # Step 4: Response generation (AI)
+│   └── orchestrator.py             # Pipeline controller with retries
 │
-├── prompts/                   # LLM prompt templates
-│   ├── classification.py      # Classification prompts (v1 zero-shot + v2 few-shot)
-│   ├── extraction.py          # Extraction prompts with JSON schema
-│   └── response.py            # Response generation with persona & guardrails
+├── prompts/                        # External prompt templates
+│   ├── classification_prompt.txt   # Classification prompt (few-shot)
+│   ├── extraction_prompt.txt       # Extraction prompt (JSON schema)
+│   ├── response_prompt.txt         # Response prompt (persona + guardrails)
+│   └── prompt_loader.py            # Reads .txt files with caching
 │
-├── utils/                     # Shared utilities
-│   ├── logger.py              # Structured logging (console + daily log files)
-│   ├── validator.py           # Pydantic output schema validation
-│   └── file_handler.py        # JSON/CSV file I/O with timestamped filenames
+├── utils/                          # Shared utilities
+│   ├── logger.py                   # Structured logging (console + daily files)
+│   ├── validator.py                # Pydantic output schema validation
+│   └── file_handler.py             # JSON/CSV file I/O
 │
 ├── data/
-│   └── sample_messages.json   # 6 sample messages for testing
+│   └── sample_messages.json        # 6 sample messages for testing
 │
-├── output/                    # Generated results (auto-created)
-└── logs/                      # Daily log files (auto-created)
+├── output/                         # Generated results (auto-created)
+└── logs/                           # Daily log files (auto-created)
 ```
 
 ---
@@ -184,61 +210,67 @@ ai-support-automation/
 2. Navigate to [API Keys](https://openrouter.ai/keys)
 3. Click **"Create Key"**
 4. Copy the key (starts with `sk-or-v1-...`)
-5. Add credit to your account (pay-per-token, no monthly fee)
+5. The default model (`openrouter/auto`) is free — no payment required
 
-### Installation Steps
+### Installation
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/ai-support-automation.git
+git clone https://github.com/MarcosN7/ai-support-automation.git
 cd ai-support-automation
 
 # 2. Create a virtual environment
 python -m venv venv
 
-# 3. Activate the virtual environment
-venv\Scripts\activate          # Windows (PowerShell/CMD)
-# source venv/bin/activate     # macOS / Linux
+# 3. Activate it
+venv\Scripts\activate            # Windows
+# source venv/bin/activate       # macOS / Linux
 
 # 4. Install dependencies
 pip install -r requirements.txt
 
-# 5. Set up your API key
-copy .env.example .env         # Windows
-# cp .env.example .env         # macOS / Linux
+# 5. Configure your API key
+copy .env.example .env           # Windows
+# cp .env.example .env           # macOS / Linux
 ```
 
-Then open `.env` in your editor and replace `your_api_key_here` with your actual OpenRouter API key:
+Open `.env` and set your key:
 
 ```env
 OPENROUTER_API_KEY=sk-or-v1-your-actual-key-here
 ```
 
-### Verify Installation
+### Verify
 
 ```bash
 python main.py --help
 ```
 
-You should see the CLI help output with available options.
-
 ---
 
 ## 📖 Usage
 
-### Process a Single Message
+### Single Message
 
 ```bash
 python main.py --message "Where is my order #12345? It's been a week!"
 ```
 
-### Batch Processing (Multiple Messages)
+### Batch Processing
 
 ```bash
 python main.py --batch data/sample_messages.json
 ```
 
-The batch file should be a JSON array of strings:
+### CSV Output
+
+```bash
+python main.py --batch data/sample_messages.json --output-format csv
+```
+
+### Batch File Format
+
+JSON array of strings:
 
 ```json
 [
@@ -248,7 +280,7 @@ The batch file should be a JSON array of strings:
 ]
 ```
 
-Or a JSON array of objects with a `"message"` key:
+Or objects with a `"message"` key:
 
 ```json
 [
@@ -257,32 +289,13 @@ Or a JSON array of objects with a `"message"` key:
 ]
 ```
 
-### Export as CSV
-
-```bash
-python main.py --batch data/sample_messages.json --output-format csv
-```
-
-### All Options
-
-```
-usage: support-automation [-h] (--message MESSAGE | --batch FILE)
-                          [--output-format {json,csv}]
-
-options:
-  -h, --help                        Show help message
-  --message MESSAGE, -m MESSAGE     Single message to process
-  --batch FILE, -b FILE             JSON file with multiple messages
-  --output-format {json,csv}, -o    Output format (default: json)
-```
-
 ---
 
 ## 📊 Example Input/Output
 
 ### Input
 
-```text
+```
 "I want a full refund for order #2210. The product arrived damaged and I'm extremely disappointed."
 ```
 
@@ -294,163 +307,140 @@ options:
   "priority": "High",
   "sentiment": "Negative",
   "order_id": "#2210",
-  "response": "I completely understand your frustration — receiving a damaged product is never the experience we want for you. I've flagged order #2210 for our refund and returns team, and they'll be reviewing it as a priority. You should hear back with the next steps shortly. If you'd like, you can also reply here with photos of the damage to help speed things along."
+  "response": "I'm really sorry to hear your order arrived damaged — that's absolutely not the experience we want for you. I've flagged order #2210 for our refund and returns team, and they'll be reviewing it as a priority. You can also send photos of the damage to help speed things along."
 }
 ```
 
-### Batch Summary (Console Output)
+### How Priority Was Determined
 
 ```
-══════════════════════════════════════════════════
+category = "Refund Request"  +  sentiment = "Negative"
+                    ↓
+        Rule: (Refund Request, Negative) → High
+                    ↓
+            priority = "High"    ← No AI used
+```
+
+### Batch Summary
+
+```
+════════════════════════════════════════════════════════════
   BATCH SUMMARY: 6 messages processed
-══════════════════════════════════════════════════
+════════════════════════════════════════════════════════════
   [1] Order Issue        | Medium | Neutral  | Order: #8834
   [2] Refund Request     | High   | Negative | Order: #2210
   [3] Shipping Delay     | Medium | Negative | Order: N/A
   [4] Product Question   | Low    | Neutral  | Order: N/A
   [5] Complaint          | High   | Negative | Order: #7751
   [6] Other              | Low    | Positive | Order: N/A
-══════════════════════════════════════════════════
-```
-
-### Output Files
-
-Results are automatically saved to the `output/` directory with timestamped filenames:
-
-```
-output/results_20260413_193512.json
-output/results_20260413_194001.csv
+════════════════════════════════════════════════════════════
 ```
 
 ---
 
 ## 🔌 OpenRouter Integration
 
-This project uses **[OpenRouter](https://openrouter.ai/)** as the LLM gateway. OpenRouter provides:
-
-- Access to 100+ models (Claude, GPT-4, Gemini, Llama, etc.) through a single API
-- Pay-per-token pricing with no monthly commitments
-- Automatic fallback and load balancing across providers
+This project uses **[OpenRouter](https://openrouter.ai/)** as the LLM gateway with a **free-tier model**.
 
 ### How It's Used
 
-All LLM calls go through a single reusable function in `services/openrouter_client.py`:
+All LLM calls go through two functions in `services/ai_client.py`:
 
 ```python
-def call_openrouter(messages, model, temperature, max_tokens) -> str:
-    """Send a chat-completion request to OpenRouter."""
-    response = requests.post(
-        "https://openrouter.ai/api/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {API_KEY}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-        },
-    )
-    return response.json()["choices"][0]["message"]["content"]
+# Simple interface — for most use cases
+response = call_llm(
+    prompt="Customer message here",
+    system_prompt="You are a classifier...",
+    temperature=0.1,
+)
+
+# Full interface — for multi-message conversations
+response = call_openrouter(
+    messages=[
+        {"role": "system", "content": "..."},
+        {"role": "user", "content": "..."},
+    ],
+)
 ```
 
-The client includes:
-- **Retry logic** — 3 attempts with exponential backoff for transient failures
-- **Timeout protection** — 60s per request to prevent indefinite hangs
-- **Structured error handling** — for rate limits (429), server errors (5xx), and malformed responses
+Built-in reliability:
+- **3 retries** with exponential backoff at the HTTP level
+- **2 retries** per pipeline step at the orchestrator level
+- **60s timeout** per request
+- **Fallback values** if all retries fail
 
 ### Changing the Model
 
-Edit `DEFAULT_MODEL` in `config.py` to use any model available on OpenRouter:
+Edit `config.py`:
 
 ```python
-DEFAULT_MODEL = "google/gemini-2.0-flash-001"      # Fast & cheap
-DEFAULT_MODEL = "anthropic/claude-sonnet-4.6"       # Balanced (default)
-DEFAULT_MODEL = "openai/gpt-4o"                     # Alternative
+DEFAULT_MODEL = "openrouter/auto"       # Free (default)
+DEFAULT_MODEL = "anthropic/claude-sonnet-4.6"          # Paid — high quality
+DEFAULT_MODEL = "google/gemini-2.0-flash-001"          # Paid — fast
 ```
-
-Browse all available models at [openrouter.ai/models](https://openrouter.ai/models).
 
 ---
 
 ## 🧠 Prompt Engineering
 
+### External Prompt Files
+
+Prompts are stored as **plain `.txt` files** in the `prompts/` directory:
+
+```
+prompts/
+├── classification_prompt.txt    # Few-shot classifier
+├── extraction_prompt.txt        # JSON extraction schema
+└── response_prompt.txt          # Persona + guardrails
+```
+
+This makes prompts easy to edit, version, and A/B test without touching Python code.
+
 ### Design Principles
 
-1. **Separate prompts per task** — each step has its own optimized prompt
-2. **Few-shot examples** — classification and extraction prompts include examples to guide output format
-3. **Strict output constraints** — prompts explicitly state "return ONLY JSON" or "return ONLY the category name"
-4. **Anti-hallucination guardrails** — "Do NOT invent or guess an order ID"
-5. **Fallback defaults** — if the LLM returns unexpected values, the system falls back gracefully
-
-### Prompt Versioning
-
-Each prompt file contains both **v1** (zero-shot) and **v2** (few-shot) versions. The v2 prompts are active in production, while v1 is preserved as a reference showing the iteration process.
+1. **Separate prompts per task** — each step is independently optimized
+2. **Few-shot examples** — guides the model toward correct output format
+3. **Strict constraints** — "Return ONLY valid JSON. No explanations."
+4. **Anti-hallucination** — "Do NOT invent or guess an order ID"
+5. **Graceful fallbacks** — malformed output is caught and defaults are used
 
 ### Temperature Strategy
 
-| Step           | Temperature | Rationale                          |
-|----------------|-------------|------------------------------------|
-| Classification | 0.1         | Near-deterministic for consistency |
-| Extraction     | 0.1         | Structured data needs precision    |
-| Response       | 0.4         | Natural language needs flexibility |
-
-### Validation Layers
-
-Even with good prompts, LLMs can produce unexpected output. The system includes multiple validation layers:
-
-1. **JSON parsing with fallback** — handles markdown fences, partial JSON, leading/trailing text
-2. **Enum validation** — categories, priorities, and sentiments are checked against allowed values
-3. **Pydantic schema** — final output is validated against a strict schema before saving
-4. **Safe defaults** — unrecognized values fall back to sensible defaults instead of crashing
-
----
-
-## 🏗 Architecture Decisions
-
-| Decision | Why |
-|---|---|
-| **3 separate LLM calls** instead of 1 | Each step can be validated independently; easier to debug and iterate on individual prompts |
-| **Pydantic for validation** | Catches malformed LLM output before it reaches output files or downstream systems |
-| **Reusable OpenRouter client** | Single point of change for API config; easier to swap models or add middleware |
-| **CLI-first design** | Easy to integrate into cron jobs, CI/CD, or wrap with a REST API later |
-| **Timestamped output files** | Prevents overwrites; creates an audit trail |
-| **Lazy API key loading** | CLI `--help` works without a configured API key |
+| Step | Temperature | Rationale |
+|---|---|---|
+| Classification | 0.1 | Near-deterministic |
+| Extraction | 0.1 | Structured data needs precision |
+| Response | 0.4 | Natural language needs flexibility |
 
 ---
 
 ## 🔮 Future Improvements
 
-### Short-term Enhancements
-
-- **REST API wrapper** — Add a FastAPI server for real-time HTTP endpoints
-- **Database storage** — Save results to PostgreSQL/Supabase for querying and analytics
-- **Confidence scoring** — Track LLM confidence to flag uncertain classifications for human review
-- **Multi-language support** — Detect language and respond in the customer's language
-
 ### Automation Integration
 
-- **[n8n](https://n8n.io/)** — Open-source workflow automation to connect this system with email, Slack, Zendesk, etc.
-- **[Zapier](https://zapier.com/)** — No-code integration with 5,000+ apps (Gmail, Shopify, HubSpot)
-- **Webhook trigger** — Accept messages via HTTP webhook and auto-process in real-time
+- **[n8n](https://n8n.io/)** — Open-source workflow automation to connect with email, Slack, Zendesk
+- **[Zapier](https://zapier.com/)** — No-code integration with 5,000+ apps
+- **Webhook trigger** — Accept messages via HTTP and auto-process in real-time
+
+### API Endpoints
+
+- **FastAPI wrapper** — Expose the pipeline as REST API endpoints
+- **WebSocket support** — Real-time processing for live chat systems
 
 ### Agent-Based Workflows
 
-- **LangChain/LangGraph agents** — Build stateful agents that can look up order status, initiate refunds, or escalate to humans
-- **Tool-use capabilities** — Give the LLM access to internal APIs (inventory, shipping tracker)
-- **Multi-turn conversations** — Extend from single-message to threaded conversation handling
-- **Human-in-the-loop** — Route high-priority/low-confidence tickets to human agents with pre-filled context
+- **LangChain/LangGraph** — Build stateful agents that look up order status or initiate refunds
+- **Tool-use** — Give the LLM access to internal APIs (inventory, shipping tracker)
+- **Human-in-the-loop** — Route low-confidence tickets to human agents
 
 ### Analytics & Monitoring
 
-- **Sentiment trend dashboard** — Track customer sentiment over time
-- **Category distribution reports** — Identify which issue types are most common
-- **Response quality scoring** — A/B test different prompt versions and models
+- **Sentiment dashboards** — Track customer mood over time
+- **Category reports** — Identify which issues are most common
 - **Cost tracking** — Monitor API spend per message and optimize model selection
 
 ---
 
 ## 📄 License
 
-This project is for educational and demonstration purposes. MIT License.
+MIT License — free for educational and demonstration purposes.

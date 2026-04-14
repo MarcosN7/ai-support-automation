@@ -1,12 +1,13 @@
 """
-AI Customer Support Automation System — Main Entry Point
+AI Customer Support Automation System — Main Entry Point (v2)
 
-CLI interface that orchestrates the full 3-step pipeline:
-  1. Classify the customer message
-  2. Extract structured data (order_id, priority, sentiment)
-  3. Generate a professional support response
+CLI interface that delegates to the orchestrator for pipeline execution.
 
-Supports single-message and batch-processing modes.
+The orchestrator runs a 4-step workflow:
+  1. Classify the customer message (AI)
+  2. Extract structured data — order_id + sentiment (AI)
+  3. Determine priority using business rules (NO AI)
+  4. Generate a professional support response (AI)
 
 Usage:
   # Single message
@@ -22,104 +23,13 @@ Usage:
 import argparse
 import json
 import sys
-import time
 
 from config import OUTPUT_DIR
-from services.classifier import classify_message
-from services.extractor import extract_data
-from services.responder import generate_response
-from utils.validator import validate_result, SupportTicketResult
+from services.orchestrator import process_message, process_batch
 from utils.file_handler import save_to_json, save_to_csv
 from utils.logger import get_logger
 
 logger = get_logger()
-
-
-# ═══════════════════════════════════════════════════════════════════
-# Pipeline
-# ═══════════════════════════════════════════════════════════════════
-
-def process_message(message: str) -> dict:
-    """
-    Run a single customer message through the full 3-step pipeline.
-
-    Returns a validated result dict with keys:
-      category, priority, sentiment, order_id, response
-    """
-    logger.info("=" * 60)
-    logger.info(f"Processing message: {message[:100]}")
-    logger.info("=" * 60)
-
-    start = time.time()
-
-    # STEP 1 — Classification
-    logger.info("STEP 1: Classifying message...")
-    category = classify_message(message)
-
-    # STEP 2 — Data Extraction
-    logger.info("STEP 2: Extracting structured data...")
-    extracted = extract_data(message)
-
-    # STEP 3 — Response Generation
-    logger.info("STEP 3: Generating support response...")
-    response_text = generate_response(message, category, extracted)
-
-    # Assemble result
-    raw_result = {
-        "category": category,
-        "priority": extracted["priority"],
-        "sentiment": extracted["sentiment"],
-        "order_id": extracted["order_id"],
-        "response": response_text,
-    }
-
-    # Validate
-    try:
-        validated: SupportTicketResult = validate_result(raw_result)
-        result = validated.model_dump()
-    except Exception as e:
-        logger.error(f"Validation failed: {e}")
-        logger.warning("Using raw (unvalidated) result as fallback.")
-        result = raw_result
-
-    elapsed = time.time() - start
-    logger.info(f"Message processed in {elapsed:.1f}s")
-
-    return result
-
-
-def process_batch(messages: list[str]) -> list[dict]:
-    """
-    Process a list of customer messages sequentially.
-
-    Returns a list of validated result dicts.
-    """
-    total = len(messages)
-    results = []
-
-    logger.info(f"Starting batch processing: {total} message(s)")
-    batch_start = time.time()
-
-    for idx, msg in enumerate(messages, 1):
-        logger.info(f"\n[{idx}/{total}] ───────────────────────────────")
-        try:
-            result = process_message(msg)
-            result["_input_message"] = msg  # Keep original for reference
-            results.append(result)
-        except Exception as e:
-            logger.error(f"Failed to process message {idx}: {e}")
-            results.append({
-                "category": "Other",
-                "priority": "Medium",
-                "sentiment": "Neutral",
-                "order_id": None,
-                "response": f"[ERROR] Could not process: {e}",
-                "_input_message": msg,
-            })
-
-    batch_elapsed = time.time() - batch_start
-    logger.info(f"\nBatch complete: {len(results)}/{total} processed in {batch_elapsed:.1f}s")
-    return results
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -131,8 +41,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="support-automation",
         description=(
-            "AI Customer Support Automation — Classify, extract, and respond "
-            "to customer support messages using an LLM (via OpenRouter)."
+            "AI Customer Support Automation — Classify, extract, prioritize, "
+            "and respond to customer support messages using an LLM (via OpenRouter) "
+            "combined with rule-based business logic."
         ),
     )
     group = parser.add_mutually_exclusive_group(required=True)
@@ -159,11 +70,35 @@ def build_parser() -> argparse.ArgumentParser:
 def _print_result(result: dict) -> None:
     """Pretty-print a single result to the console."""
     display = {k: v for k, v in result.items() if not k.startswith("_")}
-    print("\n" + "─" * 50)
+    print("\n" + "-" * 50)
     print("  RESULT")
-    print("─" * 50)
+    print("-" * 50)
     print(json.dumps(display, indent=2, ensure_ascii=False))
-    print("─" * 50)
+    print("-" * 50)
+
+
+def _print_batch_summary(results: list[dict]) -> None:
+    """Print a formatted batch summary table."""
+    print(f"\n{'=' * 60}")
+    print(f"  BATCH SUMMARY: {len(results)} messages processed")
+    print(f"{'=' * 60}")
+    for i, r in enumerate(results, 1):
+        category = r.get("category", "?")
+        priority = r.get("priority", "?")
+        sentiment = r.get("sentiment", "?")
+        order_id = r.get("order_id", "N/A") or "N/A"
+        print(
+            f"  [{i}] {category:<18} | {priority:<6} | "
+            f"{sentiment:<8} | Order: {order_id}"
+        )
+    print(f"{'=' * 60}")
+
+
+def _save_results(results: list[dict], output_format: str) -> str:
+    """Save results to file and return the filepath."""
+    if output_format == "csv":
+        return save_to_csv(results, OUTPUT_DIR)
+    return save_to_json(results, OUTPUT_DIR)
 
 
 def main():
@@ -175,13 +110,8 @@ def main():
         result = process_message(args.message)
         _print_result(result)
 
-        # Save single result
-        results = [result]
-        if args.output_format == "csv":
-            path = save_to_csv(results, OUTPUT_DIR)
-        else:
-            path = save_to_json(results, OUTPUT_DIR)
-        print(f"\n📁 Output saved to: {path}")
+        path = _save_results([result], args.output_format)
+        print(f"\n[+] Output saved to: {path}")
         return
 
     # ── Batch mode ───────────────────────────────────────────────
@@ -215,25 +145,10 @@ def main():
             sys.exit(1)
 
         results = process_batch(messages)
+        _print_batch_summary(results)
 
-        # Print summary
-        print(f"\n{'═' * 50}")
-        print(f"  BATCH SUMMARY: {len(results)} messages processed")
-        print(f"{'═' * 50}")
-        for i, r in enumerate(results, 1):
-            category = r.get("category", "?")
-            priority = r.get("priority", "?")
-            sentiment = r.get("sentiment", "?")
-            order_id = r.get("order_id", "N/A") or "N/A"
-            print(f"  [{i}] {category:<18} | {priority:<6} | {sentiment:<8} | Order: {order_id}")
-        print(f"{'═' * 50}")
-
-        # Save results
-        if args.output_format == "csv":
-            path = save_to_csv(results, OUTPUT_DIR)
-        else:
-            path = save_to_json(results, OUTPUT_DIR)
-        print(f"\n📁 Output saved to: {path}")
+        path = _save_results(results, args.output_format)
+        print(f"\n[+] Output saved to: {path}")
 
 
 if __name__ == "__main__":

@@ -35,12 +35,12 @@ def get_api_key() -> str:
 # OpenRouter API Settings
 # ---------------------------------------------------------------------------
 OPENROUTER_API_URL: str = "https://openrouter.ai/api/v1/chat/completions"
-DEFAULT_MODEL: str = "anthropic/claude-sonnet-4.6"
+DEFAULT_MODEL: str = "openrouter/auto"
 
 # Request behaviour
 REQUEST_TIMEOUT: int = 60          # seconds
 MAX_RETRIES: int = 3
-RETRY_BACKOFF_FACTOR: float = 1.5  # exponential back-off multiplier
+RETRY_BACKOFF_FACTOR: float = 3.0  # longer backoff for free-tier rate limits
 
 # LLM generation parameters
 CLASSIFICATION_TEMPERATURE: float = 0.1   # very deterministic
@@ -63,6 +63,8 @@ VALID_PRIORITIES: list[str] = ["Low", "Medium", "High"]
 VALID_SENTIMENTS: list[str] = ["Positive", "Neutral", "Negative"]
 
 # ---------------------------------------------------------------------------
-# File I/O
+# Paths
 # ---------------------------------------------------------------------------
-OUTPUT_DIR: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), "output")
+PROJECT_DIR: str = os.path.dirname(os.path.abspath(__file__))
+PROMPTS_DIR: str = os.path.join(PROJECT_DIR, "prompts")
+OUTPUT_DIR: str = os.path.join(PROJECT_DIR, "output")

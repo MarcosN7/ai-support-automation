@@ -1,24 +1,26 @@
 """
 STEP 2 — Structured Data Extraction Service.
 
-Extracts order_id, priority, and sentiment from a customer message.
-The LLM is expected to return a JSON object, which is then parsed and
-validated before being returned.
+Extracts order_id and sentiment from a customer message.
+Priority is NO LONGER extracted here — it's determined by the
+rule-based priority engine in Step 3.
+
+The LLM is expected to return a JSON object, which is then parsed
+and validated before being returned.
 """
 
 import json
 import re
 
-from config import (
-    EXTRACTION_TEMPERATURE,
-    VALID_PRIORITIES,
-    VALID_SENTIMENTS,
-)
-from prompts.extraction import build_extraction_messages
-from services.openrouter_client import call_openrouter
+from config import EXTRACTION_TEMPERATURE, VALID_SENTIMENTS
+from prompts.prompt_loader import load_prompt
+from services.ai_client import call_llm
 from utils.logger import get_logger
 
 logger = get_logger()
+
+# Prompt file loaded once and cached
+PROMPT_FILE = "extraction_prompt.txt"
 
 
 def extract_data(message: str) -> dict:
@@ -29,13 +31,16 @@ def extract_data(message: str) -> dict:
         message: The raw customer support message.
 
     Returns:
-        Dict with keys: order_id (str|None), priority (str), sentiment (str).
+        Dict with keys: order_id (str|None), sentiment (str).
+        Note: priority is NOT included — use priority_engine.determine_priority().
     """
     logger.info(f"Extracting data from: {message[:80]}...")
 
-    messages = build_extraction_messages(message)
-    raw_response = call_openrouter(
-        messages=messages,
+    system_prompt = load_prompt(PROMPT_FILE)
+
+    raw_response = call_llm(
+        prompt=message,
+        system_prompt=system_prompt,
         temperature=EXTRACTION_TEMPERATURE,
         max_tokens=200,
     )
@@ -46,8 +51,11 @@ def extract_data(message: str) -> dict:
     # ── Validate and sanitize individual fields ──────────────────
     result = {
         "order_id": _sanitize_order_id(extracted.get("order_id")),
-        "priority": _sanitize_enum(extracted.get("priority", "Medium"), VALID_PRIORITIES, "Medium"),
-        "sentiment": _sanitize_enum(extracted.get("sentiment", "Neutral"), VALID_SENTIMENTS, "Neutral"),
+        "sentiment": _sanitize_enum(
+            extracted.get("sentiment", "Neutral"),
+            VALID_SENTIMENTS,
+            "Neutral",
+        ),
     }
 
     logger.info(f"Extraction result: {result}")
@@ -81,7 +89,7 @@ def _parse_json_response(raw: str) -> dict:
 
     logger.error(f"Failed to parse JSON from LLM response: {raw}")
     # Return safe defaults so the pipeline continues
-    return {"order_id": None, "priority": "Medium", "sentiment": "Neutral"}
+    return {"order_id": None, "sentiment": "Neutral"}
 
 
 def _sanitize_order_id(value) -> str | None:
